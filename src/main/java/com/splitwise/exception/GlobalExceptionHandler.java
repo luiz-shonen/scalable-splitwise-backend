@@ -23,6 +23,16 @@ public class GlobalExceptionHandler {
     private static final String ERROR = "error";
     private static final String MESSAGE = "message";
 
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put(TIMESTAMP, LocalDateTime.now());
+        error.put(STATUS, HttpStatus.BAD_REQUEST.value());
+        error.put(ERROR, "Bad Request");
+        error.put(MESSAGE, ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleEntityNotFound(EntityNotFoundException ex) {
         Map<String, Object> error = new HashMap<>();

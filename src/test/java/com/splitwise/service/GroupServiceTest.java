@@ -13,12 +13,11 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.splitwise.dto.CreateGroupRequest;
+import com.splitwise.dto.GroupResponseDTO;
 import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
-
-import jakarta.persistence.EntityNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 class GroupServiceTest {
@@ -40,7 +39,7 @@ class GroupServiceTest {
         request.setDescription("Europe Trip");
         request.setCreatedById(1L);
 
-        User creator = User.builder().id(1L).name("John").build();
+        User creator = User.builder().id(1L).name("John").email("john@test.com").build();
         Mockito.when(userRepository.findById(1L)).thenReturn(Optional.of(creator));
 
         Group savedGroup = Group.builder()
@@ -49,39 +48,39 @@ class GroupServiceTest {
                 .description("Europe Trip")
                 .createdBy(creator)
                 .createdAt(LocalDateTime.now())
+                .members(new java.util.HashSet<>())
+                .expenses(new java.util.ArrayList<>())
                 .build();
         
-        // Simulating the save behavior
+        savedGroup.getMembers().add(creator);
+        
         Mockito.when(groupRepository.save(Mockito.any(Group.class))).thenReturn(savedGroup);
 
-        Group result = groupService.createGroup(request);
+        GroupResponseDTO result = groupService.createGroup(request);
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals("Trip", result.getName());
-        Assertions.assertEquals(creator, result.getCreatedBy());
+        Assertions.assertEquals(1L, result.getCreatedBy().getId());
         Mockito.verify(groupRepository).save(Mockito.any(Group.class));
     }
 
     @Test
-    @DisplayName("Should add member to group successfully")
-    void testAddMember() {
-        Group group = Group.builder().id(1L).name("Trip").members(new java.util.HashSet<>()).build();
-        User user = User.builder().id(2L).name("Jane").build();
+    @DisplayName("Should get group by id successfully")
+    void testGetGroupById() {
+        User creator = User.builder().id(1L).name("John").build();
+        Group group = Group.builder()
+                .id(1L)
+                .name("Trip")
+                .createdBy(creator)
+                .members(new java.util.HashSet<>())
+                .expenses(new java.util.ArrayList<>())
+                .build();
 
         Mockito.when(groupRepository.findById(1L)).thenReturn(Optional.of(group));
-        Mockito.when(userRepository.findById(2L)).thenReturn(Optional.of(user));
 
-        groupService.addMember(1L, 2L);
+        Optional<GroupResponseDTO> result = groupService.getGroupById(1L);
 
-        Mockito.verify(groupRepository).save(group);
-        Assertions.assertTrue(group.getMembers().contains(user));
-    }
-
-    @Test
-    @DisplayName("Should throw exception when group not found")
-    void testAddMemberGroupNotFound() {
-        Mockito.when(groupRepository.findById(99L)).thenReturn(Optional.empty());
-
-        Assertions.assertThrows(EntityNotFoundException.class, () -> groupService.addMember(99L, 2L));
+        Assertions.assertTrue(result.isPresent());
+        Assertions.assertEquals("Trip", result.get().getName());
     }
 }

@@ -1,14 +1,16 @@
 package com.splitwise.service;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.splitwise.dto.CreateGroupRequest;
+import com.splitwise.dto.GroupResponseDTO;
+import com.splitwise.dto.UserSummaryDTO;
+import com.splitwise.entity.Expense;
 import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.repository.GroupRepository;
@@ -25,40 +27,63 @@ public class GroupService {
     private final UserRepository userRepository;
 
     @Transactional
-    public Group createGroup(CreateGroupRequest request) {
-        User createdBy = userRepository.findById(request.getCreatedById())
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
-
-        Set<User> members = new HashSet<>();
-        members.add(createdBy);
-
-        if (request.getMemberIds() != null && !request.getMemberIds().isEmpty()) {
-            List<User> addedMembers = userRepository.findAllById(request.getMemberIds());
-            members.addAll(addedMembers);
-        }
+    public GroupResponseDTO createGroup(CreateGroupRequest request) {
+        User creator = userRepository.findById(request.getCreatedById())
+                .orElseThrow(() -> new EntityNotFoundException("Creator not found"));
 
         Group group = Group.builder()
                 .name(request.getName())
                 .description(request.getDescription())
-                .createdBy(createdBy)
-                .members(members)
+                .createdBy(creator)
                 .build();
 
-        return groupRepository.save(group);
-    }
-
-    public Optional<Group> getGroupById(Long id) {
-        return groupRepository.findById(id);
-    }
-
-    @Transactional
-    public void addMember(Long groupId, Long userId) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new EntityNotFoundException("Group not found"));
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        if (request.getMemberIds() != null && !request.getMemberIds().isEmpty()) {
+            List<User> members = userRepository.findAllById(request.getMemberIds());
+            group.getMembers().addAll(members);
+        }
         
-        group.getMembers().add(user);
-        groupRepository.save(group);
+        // Add creator as member if not already present
+        group.getMembers().add(creator);
+
+        group = groupRepository.save(group);
+        return mapToDTO(group);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<GroupResponseDTO> getGroupById(Long id) {
+        return groupRepository.findById(id).map(this::mapToDTO);
+    }
+
+    private GroupResponseDTO mapToDTO(Group group) {
+        return GroupResponseDTO.builder()
+                .id(group.getId())
+                .name(group.getName())
+                .description(group.getDescription())
+                .createdAt(group.getCreatedAt())
+                .createdBy(toUserSummary(group.getCreatedBy()))
+                .members(group.getMembers().stream()
+                        .map(this::toUserSummary)
+                        .collect(Collectors.toList()))
+                .expenses(group.getExpenses().stream()
+                        .map(this::toExpenseSummary)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    private UserSummaryDTO toUserSummary(User user) {
+        return UserSummaryDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .build();
+    }
+
+    private GroupResponseDTO.ExpenseSummaryDTO toExpenseSummary(Expense expense) {
+        return GroupResponseDTO.ExpenseSummaryDTO.builder()
+                .id(expense.getId())
+                .description(expense.getDescription())
+                .amount(expense.getAmount())
+                .createdAt(expense.getCreatedAt())
+                .build();
     }
 }

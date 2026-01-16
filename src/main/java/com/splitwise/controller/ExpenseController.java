@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.splitwise.dto.CreateExpenseRequest;
-import com.splitwise.entity.Expense;
+import com.splitwise.dto.ExpenseResponseDTO;
 import com.splitwise.service.ExpenseService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,11 +28,11 @@ public class ExpenseController {
 
     @PostMapping
     @Operation(summary = "Create a new expense", description = "Creates an expense, splits it among participants, and updates user balances.")
-    @ApiResponse(responseCode = "200", description = "Expense created successfully", content = @Content(schema = @Schema(implementation = Expense.class)))
+    @ApiResponse(responseCode = "200", description = "Expense created successfully", content = @Content(schema = @Schema(implementation = ExpenseResponseDTO.class)))
     @ApiResponse(responseCode = "400", description = "Invalid input or validation error")
     @ApiResponse(responseCode = "404", description = "User or Group not found")
-    public ResponseEntity<Expense> createExpense(@Valid @RequestBody CreateExpenseRequest request) {
-        Expense expense = expenseService.createExpense(
+    public ResponseEntity<ExpenseResponseDTO> createExpense(@Valid @RequestBody CreateExpenseRequest request) {
+        ExpenseResponseDTO expense = expenseService.createExpense(
                 request.getPaidById(),
                 request.getGroupId(),
                 request.getDescription(),

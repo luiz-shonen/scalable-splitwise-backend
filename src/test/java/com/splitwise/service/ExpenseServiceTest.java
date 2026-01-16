@@ -1,6 +1,7 @@
 package com.splitwise.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.splitwise.dto.ExpenseResponseDTO;
 import com.splitwise.entity.Expense;
 import com.splitwise.entity.ExpenseShare;
 import com.splitwise.entity.User;
@@ -55,24 +57,34 @@ class ExpenseServiceTest {
         SplitType splitType = SplitType.EQUAL;
         List<Long> participantIds = Arrays.asList(1L, 2L);
 
-        User payer = User.builder().id(payerId).name("Payer").build();
-        User participant2 = User.builder().id(2L).name("P2").build();
+        User payer = User.builder().id(payerId).name("Payer").email("payer@test.com").build();
+        User participant2 = User.builder().id(2L).name("P2").email("p2@test.com").build();
         List<User> participants = Arrays.asList(payer, participant2);
 
         Mockito.when(userRepository.findById(payerId)).thenReturn(Optional.of(payer));
         Mockito.when(userRepository.findAllById(participantIds)).thenReturn(participants);
         
-        Mockito.when(expenseRepository.save(Mockito.any(Expense.class))).thenAnswer(i -> i.getArguments()[0]);
+        Expense savedExpense = Expense.builder()
+                .id(1L)
+                .description(description)
+                .amount(amount)
+                .splitType(splitType)
+                .paidBy(payer)
+                .createdAt(LocalDateTime.now())
+                .shares(new java.util.ArrayList<>())
+                .build();
+
+        Mockito.when(expenseRepository.save(Mockito.any(Expense.class))).thenReturn(savedExpense);
         Mockito.when(splitStrategyFactory.getStrategy(splitType)).thenReturn(splitStrategy);
         
-        ExpenseShare share1 = ExpenseShare.builder().user(payer).amount(new BigDecimal("50.00")).build();
-        ExpenseShare share2 = ExpenseShare.builder().user(participant2).amount(new BigDecimal("50.00")).build();
+        ExpenseShare share1 = ExpenseShare.builder().id(1L).user(payer).amount(new BigDecimal("50.00")).settled(false).build();
+        ExpenseShare share2 = ExpenseShare.builder().id(2L).user(participant2).amount(new BigDecimal("50.00")).settled(false).build();
         List<ExpenseShare> shares = Arrays.asList(share1, share2);
         
         Mockito.when(splitStrategy.split(Mockito.any(Expense.class), Mockito.eq(participants), Mockito.any()))
                 .thenReturn(shares);
 
-        Expense result = expenseService.createExpense(payerId, null, description, amount, splitType, participantIds, null);
+        ExpenseResponseDTO result = expenseService.createExpense(payerId, null, description, amount, splitType, participantIds, null);
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(amount, result.getAmount());
