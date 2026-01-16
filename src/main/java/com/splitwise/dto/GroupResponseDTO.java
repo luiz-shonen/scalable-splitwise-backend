@@ -1,5 +1,6 @@
 package com.splitwise.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -22,7 +23,7 @@ public class GroupResponseDTO {
     public static class ExpenseSummaryDTO {
         private Long id;
         private String description;
-        private java.math.BigDecimal amount;
+        private BigDecimal amount;
         private LocalDateTime createdAt;
     }
 }

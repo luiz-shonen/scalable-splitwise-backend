@@ -3,11 +3,13 @@ package com.splitwise.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.splitwise.dto.ExpenseResponseDTO;
+import com.splitwise.dto.ExpenseSplitDTO;
 import com.splitwise.dto.ExpenseValidationContext;
 import com.splitwise.dto.UserSummaryDTO;
 import com.splitwise.entity.Expense;
@@ -52,7 +54,7 @@ public class ExpenseService {
             BigDecimal amount,
             SplitType splitType,
             List<Long> participantIds,
-            Map<Long, BigDecimal> exactAmounts
+            List<ExpenseSplitDTO> splitDetails
     ) {
         User payer = userRepository.findById(payerId)
                 .orElseThrow(() -> new EntityNotFoundException("Payer not found: " + payerId));
@@ -89,7 +91,17 @@ public class ExpenseService {
 
         // 2. Calculate Shares using Strategy
         SplitStrategy strategy = splitStrategyFactory.getStrategy(splitType);
-        List<ExpenseShare> shares = strategy.split(expense, participants, exactAmounts);
+        
+        Map<Long, BigDecimal> exactAmountsMap = null;
+        if (splitDetails != null) {
+            exactAmountsMap = splitDetails.stream()
+                    .collect(Collectors.toMap(
+                            ExpenseSplitDTO::getUserId,
+                            ExpenseSplitDTO::getAmount
+                    ));
+        }
+
+        List<ExpenseShare> shares = strategy.split(expense, participants, exactAmountsMap);
 
         // 3. Save Shares and Update Balances
         for (ExpenseShare share : shares) {

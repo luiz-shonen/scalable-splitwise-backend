@@ -1,17 +1,23 @@
 package com.splitwise.dto;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import com.splitwise.enums.SplitType;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
+import lombok.NoArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CreateExpenseRequest {
     @NotNull(message = "Payer ID is required")
     private Long paidById;
@@ -31,5 +37,5 @@ public class CreateExpenseRequest {
     @NotEmpty(message = "Participants list cannot be empty")
     private List<Long> participantIds;
 
-    private Map<Long, BigDecimal> exactAmounts;
+    private List<ExpenseSplitDTO> splitDetails;
 }

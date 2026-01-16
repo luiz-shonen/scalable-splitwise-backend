@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.splitwise.dto.CreateExpenseRequest;
+import com.splitwise.dto.ExpenseSplitDTO;
 import com.splitwise.entity.User;
 import com.splitwise.entity.UserBalance;
 import com.splitwise.enums.SplitType;
@@ -129,11 +130,11 @@ class ExpenseIntegrationTest {
         request.setSplitType(SplitType.PERCENTAGE);
         request.setParticipantIds(Arrays.asList(user1.getId(), user2.getId()));
         
-        // Passing percentages as "exactAmounts" param for now, logic matches
-        java.util.Map<Long, BigDecimal> percentages = new java.util.HashMap<>();
-        percentages.put(user1.getId(), new BigDecimal("25.00"));
-        percentages.put(user2.getId(), new BigDecimal("75.00"));
-        request.setExactAmounts(percentages);
+        // Passing percentages as "splitDetails" list
+        request.setSplitDetails(Arrays.asList(
+                ExpenseSplitDTO.builder().userId(user1.getId()).amount(new BigDecimal("25.00")).build(),
+                ExpenseSplitDTO.builder().userId(user2.getId()).amount(new BigDecimal("75.00")).build()
+        ));
 
         mockMvc.perform(post("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)

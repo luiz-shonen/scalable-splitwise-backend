@@ -39,7 +39,7 @@ public class ExpenseController {
                 request.getAmount(),
                 request.getSplitType(),
                 request.getParticipantIds(),
-                request.getExactAmounts()
+                request.getSplitDetails()
         );
         return ResponseEntity.ok(expense);
     }
