@@ -1,5 +1,7 @@
 package com.splitwise.entity;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,9 +18,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Entity representing the consolidated balance between two users.
@@ -50,8 +50,8 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class UserBalance {
+@SuperBuilder
+public class UserBalance extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -83,9 +83,6 @@ public class UserBalance {
     @Builder.Default
     private BigDecimal balance = BigDecimal.ZERO;
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
 
     /**
      * Updates the balance by adding the specified amount.
@@ -95,7 +92,6 @@ public class UserBalance {
      */
     public void addToBalance(BigDecimal amount) {
         this.balance = this.balance.add(amount);
-        this.updatedAt = LocalDateTime.now();
     }
 
     /**

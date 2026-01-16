@@ -14,12 +14,15 @@ import com.splitwise.entity.User;
 import com.splitwise.entity.UserBalance;
 import com.splitwise.repository.UserBalanceRepository;
 import com.splitwise.repository.UserRepository;
+import com.splitwise.util.StructuredLogging;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserBalanceService {
 
     private final UserBalanceRepository userBalanceRepository;
@@ -36,7 +39,8 @@ public class UserBalanceService {
     @Transactional
     public void updateUserBalance(User payer, User debtor, BigDecimal amount) {
         if (payer.getId().equals(debtor.getId())) {
-            return; // No balance update needed for self-owed amounts
+            log.trace("Skipping balance update for self: userId={}", payer.getId());
+            return; 
         }
 
         User fromUser;
@@ -54,14 +58,20 @@ public class UserBalanceService {
             amountAdjustment = amount;
         }
 
+        log.debug("Updating balance: pair=[{}, {}], adjustment={}", fromUser.getId(), toUser.getId(), amountAdjustment);
+
         Optional<UserBalance> existingBalance = userBalanceRepository
                 .findByFromUserAndToUser(fromUser, toUser);
 
-        UserBalance userBalance = existingBalance.orElseGet(() -> UserBalance.builder()
+        UserBalance userBalance = existingBalance.orElseGet(() -> {
+            UserBalance newBalance = UserBalance.builder()
                 .fromUser(fromUser)
                 .toUser(toUser)
                 .balance(BigDecimal.ZERO)
-                .build());
+                .build();
+            log.info("Updating user balance: {}", StructuredLogging.getKV("balanceId", newBalance.getId()));
+            return newBalance;
+        });
 
         userBalance.addToBalance(amountAdjustment);
         userBalanceRepository.save(userBalance);
@@ -75,6 +85,8 @@ public class UserBalanceService {
      */
     @Transactional(readOnly = true)
     public BalanceResponseDTO getUserBalance(Long userId) {
+        log.debug("Fetching balances for userId={}", userId);
+        
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
@@ -90,9 +102,6 @@ public class UserBalanceService {
             User fromUser = b.getFromUser();
             User toUser = b.getToUser();
 
-            // Balance > 0: from owes to
-            // Balance < 0: to owes from
-            
             User creditor;
             User debtor;
             BigDecimal absoluteAmount = amount.abs();
@@ -106,13 +115,11 @@ public class UserBalanceService {
             }
 
             if (creditor.getId().equals(userId)) {
-                // Someone owes the current user
                 owedToUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
                         .user(toSummary(debtor))
                         .amount(absoluteAmount)
                         .build());
             } else if (debtor.getId().equals(userId)) {
-                // Current user owes someone
                 owedByUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
                         .user(toSummary(creditor))
                         .amount(absoluteAmount)
@@ -120,6 +127,7 @@ public class UserBalanceService {
             }
         }
 
+        log.debug("Found {} credit/debit pairs for user {}", owedToUser.size() + owedByUser.size(), userId);
         return BalanceResponseDTO.builder()
                 .owedToUser(owedToUser)
                 .owedByUser(owedByUser)

@@ -1,6 +1,5 @@
 package com.splitwise.entity;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +26,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Entity representing a group in the Splitwise system.
@@ -38,8 +38,8 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class Group {
+@SuperBuilder
+public class Group extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,10 +50,6 @@ public class Group {
 
     @Column(length = 500)
     private String description;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
 
     /**
      * The user who created this group.
@@ -86,6 +82,7 @@ public class Group {
     @JsonManagedReference(value = "group-expenses")
     @Builder.Default
     private List<Expense> expenses = new ArrayList<>();
+
 
     /**
      * Adds a member to the group.

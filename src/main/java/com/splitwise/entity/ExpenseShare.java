@@ -1,6 +1,10 @@
 package com.splitwise.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,9 +19,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import lombok.experimental.SuperBuilder;
 
 /**
  * Entity representing a user's share of an expense.
@@ -29,8 +31,8 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class ExpenseShare {
+@SuperBuilder
+public class ExpenseShare extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,10 +51,6 @@ public class ExpenseShare {
     @Column(nullable = false)
     @Builder.Default
     private Boolean settled = false;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "settled_at")
     private LocalDateTime settledAt;
@@ -74,6 +72,7 @@ public class ExpenseShare {
     @JoinColumn(name = "user_id", nullable = false)
     @JsonBackReference(value = "user-shares")
     private User user;
+
 
     /**
      * Marks this share as settled and records the settlement time.

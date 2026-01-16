@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
 import com.splitwise.strategy.SplitStrategy;
 import com.splitwise.strategy.SplitStrategyFactory;
+import com.splitwise.util.StructuredLogging;
 import com.splitwise.validator.ExpenseValidator;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -47,6 +51,11 @@ public class ExpenseService {
      * Guaranteed atomic via @Transactional.
      */
     @Transactional
+    @Retryable(
+        retryFor = ObjectOptimisticLockingFailureException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100)
+    )
     public ExpenseResponseDTO createExpense(
             Long payerId,
             Long groupId,
@@ -56,6 +65,9 @@ public class ExpenseService {
             List<Long> participantIds,
             List<ExpenseSplitDTO> splitDetails
     ) {
+        log.info("Creating expense: description={}, amount={}, splitType={}, payerId={}, groupId={}", 
+                description, amount, splitType, payerId, groupId);
+
         User payer = userRepository.findById(payerId)
                 .orElseThrow(() -> new EntityNotFoundException("Payer not found: " + payerId));
 
@@ -67,6 +79,7 @@ public class ExpenseService {
 
         List<User> participants = userRepository.findAllById(participantIds);
         if (participants.size() != participantIds.size()) {
+            log.error("Participant mismatch: requestedIds={}, foundCount={}", participantIds, participants.size());
             throw new EntityNotFoundException("One or more participants not found");
         }
 
@@ -91,6 +104,7 @@ public class ExpenseService {
                 .build();
 
         expense = expenseRepository.save(expense);
+        log.debug("Expense entity saved: {}", StructuredLogging.getKV("expenseId", expense.getId()));
 
         // 2. Calculate Shares using Strategy
         SplitStrategy strategy = splitStrategyFactory.getStrategy(splitType);
@@ -110,12 +124,14 @@ public class ExpenseService {
         for (ExpenseShare share : shares) {
             share.setExpense(expense);
             expenseShareRepository.save(share);
+            log.debug("Creating expense share: {}", StructuredLogging.getKV("shareId", share.getId()));
 
             // Update balance: Participant owes Payer
             userBalanceService.updateUserBalance(payer, share.getUser(), share.getAmount());
         }
         
         expense.setShares(shares);
+        log.info("Expense created successfully: {}", StructuredLogging.getKV("expenseId", expense.getId()));
         return mapToDTO(expense);
     }
 

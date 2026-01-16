@@ -4,9 +4,11 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,25 +24,17 @@ public class GlobalExceptionHandler {
     private static final String STATUS = "status";
     private static final String ERROR = "error";
     private static final String MESSAGE = "message";
+    private static final String REQUEST_ID = "requestId";
+    private static final String BAD_REQUEST = "Bad Request";
 
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(ValidationException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.BAD_REQUEST.value());
-        error.put(ERROR, "Bad Request");
-        error.put(MESSAGE, ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        return createErrorResponse(HttpStatus.BAD_REQUEST, BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleEntityNotFound(EntityNotFoundException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.NOT_FOUND.value());
-        error.put(ERROR, "Not Found");
-        error.put(MESSAGE, ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return createErrorResponse(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -58,48 +52,47 @@ public class GlobalExceptionHandler {
         response.put(ERROR, "Validation Error");
         response.put(MESSAGE, "Input validation failed");
         response.put("details", errors);
+        response.put(REQUEST_ID, MDC.get(REQUEST_ID));
         
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {
+        return createErrorResponse(HttpStatus.CONFLICT, "Conflict", 
+                "The record was updated by another user. Please refresh and try again.");
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.BAD_REQUEST.value());
-        error.put(ERROR, "Bad Request");
-        error.put(MESSAGE, ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        return createErrorResponse(HttpStatus.BAD_REQUEST, BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.CONFLICT.value());
-        error.put(ERROR, "Conflict");
-        error.put(MESSAGE, "Data integrity violation: " + ex.getMostSpecificCause().getMessage());
-        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+        return createErrorResponse(HttpStatus.CONFLICT, "Conflict", 
+                "Data integrity violation: " + ex.getMostSpecificCause().getMessage());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.BAD_REQUEST.value());
-        error.put(ERROR, "Bad Request");
         String typeName = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
-        error.put(MESSAGE, String.format("Parameter '%s' should be of type '%s'", ex.getName(), typeName));
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        String message = String.format("Parameter '%s' should be of type '%s'", ex.getName(), typeName);
+        return createErrorResponse(HttpStatus.BAD_REQUEST, BAD_REQUEST, message);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
-        Map<String, Object> error = new HashMap<>();
-        error.put(TIMESTAMP, LocalDateTime.now());
-        error.put(STATUS, HttpStatus.INTERNAL_SERVER_ERROR.value());
-        error.put(ERROR, "Internal Server Error");
-        error.put(MESSAGE, ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+        return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage());
+    }
+
+    private ResponseEntity<Map<String, Object>> createErrorResponse(HttpStatus status, String error, String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put(TIMESTAMP, LocalDateTime.now());
+        response.put(STATUS, status.value());
+        response.put(ERROR, error);
+        response.put(MESSAGE, message);
+        response.put(REQUEST_ID, MDC.get(REQUEST_ID));
+        return new ResponseEntity<>(response, status);
     }
 }

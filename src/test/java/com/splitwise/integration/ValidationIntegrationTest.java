@@ -27,7 +27,10 @@ import com.splitwise.dto.ExpenseSplitDTO;
 import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.enums.SplitType;
+import com.splitwise.repository.ExpenseRepository;
+import com.splitwise.repository.ExpenseShareRepository;
 import com.splitwise.repository.GroupRepository;
+import com.splitwise.repository.UserBalanceRepository;
 import com.splitwise.repository.UserRepository;
 
 @SpringBootTest
@@ -46,10 +49,22 @@ class ValidationIntegrationTest {
     private GroupRepository groupRepository;
 
     @Autowired
+    private ExpenseRepository expenseRepository;
+
+    @Autowired
+    private ExpenseShareRepository expenseShareRepository;
+
+    @Autowired
+    private UserBalanceRepository userBalanceRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
+        expenseShareRepository.deleteAll();
+        expenseRepository.deleteAll();
+        userBalanceRepository.deleteAll();
         groupRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -181,5 +196,51 @@ class ValidationIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("in split details is not in the participants list")));
+    }
+
+    @Test
+    @DisplayName("Should return 400 when splitType is EXACT but splitDetails are missing")
+    void testExactSplitDetailsMissing() throws Exception {
+        User user1 = userRepository.save(User.builder().name("User 1").email("user1@test.com").build());
+        User user2 = userRepository.save(User.builder().name("User 2").email("user2@test.com").build());
+
+        CreateExpenseRequest request = new CreateExpenseRequest();
+        request.setDescription("Forgot details Dinner");
+        request.setAmount(new BigDecimal("100.00"));
+        request.setPaidById(user1.getId());
+        request.setSplitType(SplitType.EXACT);
+        request.setParticipantIds(Arrays.asList(user1.getId(), user2.getId()));
+        // splitDetails is null
+
+        mockMvc.perform(post("/api/expenses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Split details are required for EXACT")));
+    }
+
+    @Test
+    @DisplayName("Should return 400 when participant is not in group")
+    void testParticipantNotInGroupValidation() throws Exception {
+        User groupMember = userRepository.save(User.builder().name("Member").email("member@test.com").build());
+        User outsider = userRepository.save(User.builder().name("Outsider").email("outsider@test.com").build());
+        
+        Group group = Group.builder().name("Trips").createdBy(groupMember).build();
+        group.getMembers().add(groupMember);
+        group = groupRepository.save(group);
+
+        CreateExpenseRequest request = new CreateExpenseRequest();
+        request.setDescription("Illegal Guest");
+        request.setAmount(new BigDecimal("100.00"));
+        request.setPaidById(groupMember.getId());
+        request.setGroupId(group.getId());
+        request.setSplitType(SplitType.EQUAL);
+        request.setParticipantIds(Arrays.asList(groupMember.getId(), outsider.getId()));
+
+        mockMvc.perform(post("/api/expenses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("does not belong to group")));
     }
 }
