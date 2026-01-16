@@ -6,6 +6,15 @@
 
 A highly scalable, denormalized expense-sharing engine designed for precision and extensibility. This project demonstrates advanced architectural patterns used to handle large-scale financial transactions in a distributed environment.
 
+## Engineering Philosophy: Speed vs. Quality
+
+In high-growth engineering environments, rapid delivery is essential. To demonstrate a balance between speed and architectural integrity, this MVP was implemented in a few hours, with a focus on:
+- **Automated Documentation**: Full OpenAPI/Swagger integration for instant API discovery.
+- **Containerization**: Production-ready Docker & Docker Compose setup.
+- **Scalable System Design**: Denormalized balance tracking and Strategy-based extensibility.
+
+This showcases that rapid shipping can coexist with SOLID principles and operational excellence.
+
 ## 1. Financial Precision
 
 Maintaining accuracy in financial calculations is paramount. Two key decisions were made:
