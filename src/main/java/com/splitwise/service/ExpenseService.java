@@ -74,8 +74,11 @@ public class ExpenseService {
                 .payer(payer)
                 .group(group)
                 .participants(participants)
+                .amount(amount)
+                .splitType(splitType)
+                .splitDetails(splitDetails)
                 .build();
-        
+
         expenseValidator.validateAndThrow(context, "expenseValidationContext");
 
         // 1. Create Expense
@@ -109,8 +112,6 @@ public class ExpenseService {
             expenseShareRepository.save(share);
 
             // Update balance: Participant owes Payer
-            // If participant is the payer, strict logic would say they owe themselves, 
-            // but UserBalanceService handles self-owed check.
             userBalanceService.updateUserBalance(payer, share.getUser(), share.getAmount());
         }
         

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.splitwise.dto.CreateExpenseRequest;
 import com.splitwise.dto.CreateGroupRequest;
 import com.splitwise.dto.CreateUserRequest;
+import com.splitwise.dto.ExpenseSplitDTO;
 import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.enums.SplitType;
@@ -108,5 +109,77 @@ class ValidationIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("does not belong to group")));
+    }
+
+    @Test
+    @DisplayName("Should return 400 when splitType is EQUAL but splitDetails are provided")
+    void testEqualSplitConflictValidation() throws Exception {
+        User user1 = userRepository.save(User.builder().name("User 1").email("user1@test.com").build());
+        User user2 = userRepository.save(User.builder().name("User 2").email("user2@test.com").build());
+
+        CreateExpenseRequest request = new CreateExpenseRequest();
+        request.setDescription("Confusing Dinner");
+        request.setAmount(new BigDecimal("100.00"));
+        request.setPaidById(user1.getId());
+        request.setSplitType(SplitType.EQUAL);
+        request.setParticipantIds(Arrays.asList(user1.getId(), user2.getId()));
+        request.setSplitDetails(Arrays.asList(
+                ExpenseSplitDTO.builder().userId(user1.getId()).amount(new BigDecimal("50.00")).build()
+        ));
+
+        mockMvc.perform(post("/api/expenses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Split details should not be provided for EQUAL")));
+    }
+
+    @Test
+    @DisplayName("Should return 400 when EXACT split sum does not match total amount")
+    void testExactSplitSumMismatch() throws Exception {
+        User user1 = userRepository.save(User.builder().name("User 1").email("user1@test.com").build());
+        User user2 = userRepository.save(User.builder().name("User 2").email("user2@test.com").build());
+
+        CreateExpenseRequest request = new CreateExpenseRequest();
+        request.setDescription("Bad Math Dinner");
+        request.setAmount(new BigDecimal("100.00"));
+        request.setPaidById(user1.getId());
+        request.setSplitType(SplitType.EXACT);
+        request.setParticipantIds(Arrays.asList(user1.getId(), user2.getId()));
+        request.setSplitDetails(Arrays.asList(
+                ExpenseSplitDTO.builder().userId(user1.getId()).amount(new BigDecimal("40.00")).build(),
+                ExpenseSplitDTO.builder().userId(user2.getId()).amount(new BigDecimal("50.00")).build()
+        ));
+
+        mockMvc.perform(post("/api/expenses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("The sum of split details ([90.00]) must equal the total expense amount ([100.00])")));
+    }
+
+    @Test
+    @DisplayName("Should return 400 when splitDetail contains user not in participantIds")
+    void testSplitParticipantInconsistency() throws Exception {
+        User user1 = userRepository.save(User.builder().name("User 1").email("user1@test.com").build());
+        User user2 = userRepository.save(User.builder().name("User 2").email("user2@test.com").build());
+        User user3 = userRepository.save(User.builder().name("User 3").email("user3@test.com").build());
+
+        CreateExpenseRequest request = new CreateExpenseRequest();
+        request.setDescription("Inconsistent Dinner");
+        request.setAmount(new BigDecimal("100.00"));
+        request.setPaidById(user1.getId());
+        request.setSplitType(SplitType.EXACT);
+        request.setParticipantIds(Arrays.asList(user1.getId(), user2.getId()));
+        request.setSplitDetails(Arrays.asList(
+                ExpenseSplitDTO.builder().userId(user1.getId()).amount(new BigDecimal("50.00")).build(),
+                ExpenseSplitDTO.builder().userId(user3.getId()).amount(new BigDecimal("50.00")).build()
+        ));
+
+        mockMvc.perform(post("/api/expenses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("in split details is not in the participants list")));
     }
 }
