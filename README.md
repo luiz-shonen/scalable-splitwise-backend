@@ -101,18 +101,29 @@ Quality is ensured through a comprehensive testing pyramid:
 mvn test -s settings-local.xml
 ```
 
-## 6. Getting Started (Docker)
+The entire stack (API + PostgreSQL) can be provisioned in two steps (recommended for environments with restricted Docker networking):
 
-The entire stack (API + PostgreSQL) can be provisioned with a single command:
+1. **Build the JAR locally** (Ensure Maven has internet/proxy access):
+   ```bash
+   mvn clean package -s settings-local.xml -DskipTests
+   ```
 
-```bash
-docker compose up -d
-```
+2. **Run with Docker Compose**:
+   ```bash
+   docker compose up --build -d
+   ```
+
+> [!TIP]
+> Use the provided automation script for a single-command setup:
+> ```bash
+> chmod +x build-and-run.sh
+> ./build-and-run.sh
+> ```
 
 Once running, access the **Swagger UI** at: `http://localhost:8080/swagger-ui.html`
 or run the automated test suite:
 ```bash
-./test-script.sh
+bash test-script.sh
 ```
 
 ## 7. Logging

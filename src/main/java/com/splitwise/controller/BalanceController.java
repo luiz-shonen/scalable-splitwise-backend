@@ -2,9 +2,7 @@ package com.splitwise.controller;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +10,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.splitwise.dto.BalanceResponseDTO;
+import com.splitwise.dto.UserSummaryDTO;
+import com.splitwise.entity.User;
 import com.splitwise.entity.UserBalance;
 import com.splitwise.repository.UserBalanceRepository;
 import com.splitwise.repository.UserRepository;
@@ -29,46 +30,46 @@ public class BalanceController {
 
     /**
      * Gets the consolidated view of balances for a user.
-     * Returns a map of who owes this user and who this user owes.
+     * Returns a DTO containing who owes this user and who this user owes.
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<Map<String, Object>> getUserBalances(@PathVariable Long userId) {
+    public ResponseEntity<BalanceResponseDTO> getUserBalances(@PathVariable(name = "userId") Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new EntityNotFoundException("User not found");
         }
 
-        // Fetch all balances to calculate consolidated view
-        // Note: For large datasets, a custom SQL query using aggregation would be more performant
         List<UserBalance> allBalances = userBalanceRepository.findAll();
 
-        List<Map<String, Object>> owedToUser = new ArrayList<>();
-        List<Map<String, Object>> owedByUser = new ArrayList<>();
+        List<BalanceResponseDTO.UserBalanceDTO> owedToUser = new ArrayList<>();
+        List<BalanceResponseDTO.UserBalanceDTO> owedByUser = new ArrayList<>();
 
         for (UserBalance b : allBalances) {
             if (b.getBalance().compareTo(BigDecimal.ZERO) == 0) continue;
 
-            // Recall: Balance positive means From owes To.
-            // b.getFromUser() owes b.getToUser() amount b.getBalance()
-
             if (b.getToUser().getId().equals(userId)) {
-                // Someone owes this user (Positive balance)
-                Map<String, Object> entry = new HashMap<>();
-                entry.put("user", b.getFromUser());
-                entry.put("amount", b.getBalance());
-                owedToUser.add(entry);
+                owedToUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
+                        .user(toSummary(b.getFromUser()))
+                        .amount(b.getBalance())
+                        .build());
             } else if (b.getFromUser().getId().equals(userId)) {
-                // This user owes someone (Positive balance)
-                Map<String, Object> entry = new HashMap<>();
-                entry.put("user", b.getToUser());
-                entry.put("amount", b.getBalance());
-                owedByUser.add(entry);
+                owedByUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
+                        .user(toSummary(b.getToUser()))
+                        .amount(b.getBalance())
+                        .build());
             }
         }
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("owedToUser", owedToUser);
-        response.put("owedByUser", owedByUser);
+        return ResponseEntity.ok(BalanceResponseDTO.builder()
+                .owedToUser(owedToUser)
+                .owedByUser(owedByUser)
+                .build());
+    }
 
-        return ResponseEntity.ok(response);
+    private UserSummaryDTO toSummary(User user) {
+        return UserSummaryDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .build();
     }
 }
