@@ -1,6 +1,10 @@
-# Splitwise MVP - Architectural Decisions
+# Splitwise Core API (MVP)
 
-This document outlines the key technical decisions and architectural patterns adopted in the implementation of the Splitwise MVP backend.
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen)](https://spring.io/projects/spring-boot)
+[![Java 21](https://img.shields.io/badge/Java-21-blue)](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-blue)](https://www.docker.com/)
+
+A highly scalable, denormalized expense-sharing engine designed for precision and extensibility. This project demonstrates advanced architectural patterns used to handle large-scale financial transactions in a distributed environment.
 
 ## 1. Financial Precision
 
@@ -10,30 +14,64 @@ Maintaining accuracy in financial calculations is paramount. Two key decisions w
 - **Cent Distribution Algorithm:** When dividing expenses (e.g., $10.00 split among 3 people), the system does not lose cents. The `EqualSplitStrategy` calculates base shares rounded down and distributes the remainder cents to the first participants ensuring uniqueness and that `sum(shares) == total_amount`.
   - Example: $100 / 3 => $33.34, $33.33, $33.33.
 
-## 2. Scalability: UserBalance Entity
+## 2. Domain Model
 
-A naive implementation for calculating "Who owes whom" would involve summing up all unsettled expense shares between two users each time the balance is requested. This would be an `O(N)` operation where N is the number of transactions history.
+```mermaid
+erDiagram
+    USER ||--o{ EXPENSE : "pays"
+    USER ||--o{ EXPENSE_SHARE : "owes"
+    GROUP ||--o{ EXPENSE : "contains"
+    EXPENSE ||--o{ EXPENSE_SHARE : "is split into"
+    USER ||--o{ USER_BALANCE : "has net debt"
+```
 
-To ensure `O(1)` read performance for balances:
-- **`UserBalance` Entity:** We introduced a consolidated balance entity that is updated atomically with every expense creation.
-- **Unique Constraint:** A composite unique constraint ensures only one record exists per pair of users `(from_user_id, to_user_id)`.
-- **ID Convention:** To avoid duplicate pairs like (A, B) and (B, A), we adhere to a convention where `from_user_id < to_user_id` is enforced at the service level (or DB constraint level in a real-world scenario). The sign of the `balance` field indicates the direction of debt:
-  - Positive: `fromUser` owes `toUser`.
-  - Negative: `toUser` owes `fromUser`.
+## 3. System Design Decisions
 
-This design allows for instant retrieval of balances for the dashboard without heavy aggregation queries.
+### Scalability & Performance
+To handle a scale of millions of users and transactions, this API avoids on-the-fly balance calculations. 
 
-## 3. Extensibility: Strategy Pattern
+```mermaid
+graph TD
+    A[Create Expense] --> B{Calculate Shares}
+    B --> C[Strategy Pattern]
+    C --> D[Save Individual Shares]
+    D --> E[Update Denormalized Balances]
+    E --> F[UserBalance Table]
+    F -- "O(1) Fetch" --> G[Dashboard]
+```
 
-The application is designed to support multiple expense splitting methods (Equal, Exact Amount, Percentage, Shares) without modifying the core `ExpenseService`.
+- **UserBalance Entity**: We maintain a denormalized table that stores the net balance between pairs of users. This transforms a heavy aggregation query into a simple indexed lookup.
+- **Transactional Integrity**: All balance updates happen within the same database transaction as the expense creation, ensuring data consistency via `@Transactional`.
 
-- **`SplitStrategy` Interface:** Defines the contract for splitting logic.
-- **Implementations:**
-  - `EqualSplitStrategy`: Handles equal division logic.
-  - `ExactAmountStrategy`: Validates and delegates exact inputs.
-- **Factory Pattern:** `SplitStrategyFactory` selects the appropriate strategy based on the `SplitType` enum at runtime.
+### Extensibility (SOLID)
+Instead of bloated service classes, I implemented the **Strategy Pattern** for expense splitting.
 
-This adheres to the Open/Closed Principle (OCP), allowing new splitting algorithms to be added as new classes.
+```mermaid
+classDiagram
+    class SplitStrategy {
+        <<interface>>
+        +split(amount, participants, exactAmounts) List~BigDecimal~
+    }
+    class EqualSplitStrategy {
+        +split()
+    }
+    class ExactAmountStrategy {
+        +split()
+    }
+    class PercentageSplitStrategy {
+        +split()
+    }
+    SplitStrategy <|.. EqualSplitStrategy
+    SplitStrategy <|.. ExactAmountStrategy
+    SplitStrategy <|.. PercentageSplitStrategy
+```
+
+- `SplitStrategy`: Interface defining the contract.
+- `EqualSplitStrategy`: Handles rounding errors and remainder distribution (penny problem).
+- `ExactAmountStrategy`: Handles specific user-defined amounts.
+- `PercentageSplitStrategy`: Calculates shares based on % distribution.
+
+This makes it trivial to add new split types (e.g., Shares) without modifying existing tested code.
 
 ## 4. Layered Architecture
 
@@ -42,6 +80,71 @@ We followed a strict layered architecture:
 - **Services:** encapsulate all business rules (e.g., creating users, calculating splits, updating balances transactionally).
 - **DTOs vs Entities:** Validation annotations (`@NotNull`, `@Email`, etc.) are placed on DTOs to sanitise input at the API boundary, keeping JPA Entities focused on data persistence and schema definition.
 
-## 5. Logging
+## 5. Testing Strategy
+
+Quality is ensured through a comprehensive testing pyramid:
+- **Unit Tests**: Mathematical verification of all `SplitStrategy` implementations.
+- **Service Layer Tests**: Business rule validation using Mockito to isolate external dependencies.
+- **Integration Tests**: End-to-end API flows using **H2 (In-Memory)** for rapid feedback loops and **Testcontainers** (ready for roadmap) for production-parity verification.
+
+```bash
+# Run all tests
+mvn test -s settings-local.xml
+```
+
+## 6. Getting Started (Docker)
+
+The entire stack (API + PostgreSQL) can be provisioned with a single command:
+
+```bash
+docker compose up -d
+```
+
+Once running, access the **Swagger UI** at: `http://localhost:8080/swagger-ui.html`
+or run the automated test suite:
+```bash
+./test-script.sh
+```
+
+## 7. Logging
 
 SLF4J is used for logging critical business logic steps, such as the distribution of remainder cents in the splitting strategy, aiding in debugging and auditability.
+
+## 8. Deep Dive: Equal Split Algorithm
+
+One of the interesting challenges in splitting expenses is handling precision loss. For example, splitting $100.00 among 3 people results in $33.333... per person.
+We cannot simply round to nearest, as $33.33 * 3 = $99.99, leaving 1 cent unaccounted for (or created out of thin air if rounded up).
+
+Our `EqualSplitStrategy` handles this with an efficient O(N) approach:
+1.  **Base Calculation**: Calculate `floor(Total / N)` to get the minimum share (e.g., $33.33).
+2.  **Remainder Calculation**: `Total - (Base * N)` gives the remaining cents (e.g., $0.01).
+3.  **Distribution**: We iterate through the participants and distribute the `remainder` cents, one by one, to the first `k` participants (where `k` is the number of remainder cents).
+
+This guarantees that:
+- `Sum(Shares) == TotalAmount` exactly.
+- No participant pays more than 1 cent difference from any other.
+- The operation remains linear `O(N)` with respect to the number of participants.
+
+## 9. Production Readiness Roadmap
+
+To take this MVP to a production environment, the following improvements are recommended:
+
+### 1. Security
+- **Authentication & Authorization:** Implement **Spring Security** with **JWT** (JSON Web Tokens) or OAuth2 (e.g., Keycloak/Auth0) to secure endpoints. Currently, the API is open.
+- **HTTPS:** Enforce SSL/TLS encryption.
+- **Secrets Management:** Use tools like AWS Secrets Manager or HashiCorp Vault instead of environment variables for sensitive credentials.
+
+### 2. Database & Data Integrity
+- **Migrations:** Replace Hibernate `ddl-auto: update` with version control tools like **Flyway** or **Liquibase** for predictable schema changes.
+- **Connection Pooling:** Tune **HikariCP** settings for high throughput.
+- **Caching:** Implement **Redis** (Second Level Cache) for frequently accessed data like User Balances.
+
+### 3. Observability & Monitoring
+- **Metrics:** Expose metrics via **Micrometer** for **Prometheus** and visualize in **Grafana**.
+- **Distributed Tracing:** Integrate **OpenTelemetry** / **Zipkin** to trace requests across microservices.
+- **Centralized Logging:** Ship logs to ELK Stack (Elasticsearch, Logstash, Kibana) or Datadog.
+
+### 4. Infrastructure & DevOps
+- **CI/CD:** Set up pipelines (GitHub Actions/GitLab CI) for automated testing and deployment.
+- **Container Orchestration:** Deploy using **Kubernetes (K8s)** or AWS ECS for auto-scaling and high availability.
+- **Resiliency:** Implement **Resilience4j** for Circuit Breakers and Rate Limiting to prevent cascading failures.

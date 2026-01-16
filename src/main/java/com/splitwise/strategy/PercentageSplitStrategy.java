@@ -13,15 +13,17 @@ import com.splitwise.entity.Expense;
 import com.splitwise.entity.ExpenseShare;
 import com.splitwise.entity.User;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Strategy implementation for splitting expenses using percentages per participant.
- * Validates that the sum of percentages equals 100%.
+ * Validates that the sum of percentages equals 100%. Handles precision adjustments.
  */
 @Component
+@Slf4j
 public class PercentageSplitStrategy implements SplitStrategy {
     
-    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100.00");
-    private static final BigDecimal ERROR_MARGIN = new BigDecimal("0.01");
+    private static final BigDecimal PERCENTAGE_DIVISOR = new BigDecimal("100.00");
 
     @Override
     public List<ExpenseShare> split(
@@ -33,14 +35,16 @@ public class PercentageSplitStrategy implements SplitStrategy {
 
         List<ExpenseShare> shares = new ArrayList<>();
         BigDecimal totalAmount = expense.getAmount();
+        log.debug("Splitting expense amount {} using percentages for {} participants", totalAmount, participants.size());
 
         for (User participant : participants) {
             BigDecimal percentage = percentages.get(participant.getId());
             
             // Calculate share: (Total * Percentage) / 100
             BigDecimal shareAmount = totalAmount.multiply(percentage)
-                    .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+                    .divide(PERCENTAGE_DIVISOR, 2, RoundingMode.HALF_UP);
             
+            log.trace("Participant {}: percentage {}%, calculated share {}", participant.getId(), percentage, shareAmount);
             // Note: Simple multiplication might cause rounding issues if not careful.
             // But usually 33.33% of 100 is 33.33. 
             // If we have 33.33, 33.33, 33.34 -> 99.99 for sum. 
@@ -70,11 +74,13 @@ public class PercentageSplitStrategy implements SplitStrategy {
                 
         if (currentSum.compareTo(totalAmount) != 0) {
             BigDecimal remainder = totalAmount.subtract(currentSum);
-            // Add remainder to first share? Or the one with highest percentage? 
-            // Let's add to first share for simplicity or random.
+            log.info("Percentages caused rounding gap of {}. Adjusting first participant.", remainder);
+            
             if (!shares.isEmpty()) {
                  ExpenseShare firstShare = shares.get(0);
-                 firstShare.setAmount(firstShare.getAmount().add(remainder));
+                 BigDecimal adjustedAmount = firstShare.getAmount().add(remainder);
+                 log.debug("Adjusting share for user {} from {} to {}", firstShare.getUser().getId(), firstShare.getAmount(), adjustedAmount);
+                 firstShare.setAmount(adjustedAmount);
             }
         }
 
@@ -117,9 +123,7 @@ public class PercentageSplitStrategy implements SplitStrategy {
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Allow small margin? No, users should provide exactly 100 for explicit percentage.
-        // Usually UI helps sum to 100.
-        if (sumOfPercentages.compareTo(ONE_HUNDRED) != 0) {
+        if (sumOfPercentages.compareTo(PERCENTAGE_DIVISOR) != 0) {
              throw new IllegalArgumentException(
                     String.format(
                             "Sum of percentages (%s) does not equal 100%%",
