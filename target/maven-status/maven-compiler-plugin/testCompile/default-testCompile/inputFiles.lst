@@ -1,0 +1,8 @@
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/service/UserServiceTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/service/GroupServiceTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/integration/UserIntegrationTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/integration/ExpenseIntegrationTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/strategy/PercentageSplitStrategyTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/strategy/EqualSplitStrategyTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/service/ExpenseServiceTest.java
+/home/luiz.rodrigues/Documents/Dev/Personal/splitwise/src/test/java/com/splitwise/strategy/ExactAmountStrategyTest.java
