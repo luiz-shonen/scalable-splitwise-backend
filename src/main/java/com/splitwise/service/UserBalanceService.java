@@ -1,20 +1,29 @@
 package com.splitwise.service;
 
-import com.splitwise.entity.User;
-import com.splitwise.entity.UserBalance;
-import com.splitwise.repository.UserBalanceRepository;
-import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.Optional;
+import com.splitwise.dto.BalanceResponseDTO;
+import com.splitwise.dto.UserSummaryDTO;
+import com.splitwise.entity.User;
+import com.splitwise.entity.UserBalance;
+import com.splitwise.repository.UserBalanceRepository;
+import com.splitwise.repository.UserRepository;
+
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class UserBalanceService {
 
     private final UserBalanceRepository userBalanceRepository;
+    private final UserRepository userRepository;
 
     /**
      * Updates the balance between a payer and a debtor.
@@ -36,20 +45,10 @@ public class UserBalanceService {
 
         // Ensure fromUser always has the lower ID to satisfy unique constraint
         if (payer.getId() < debtor.getId()) {
-            // Payer (from) < Debtor (to)
-            // We want to record that Debtor owes Payer.
-            // Since Balance positive means "From owes To", and here "To owes From",
-            // we must subtract the amount.
-            // Example: Payer=1 (from), Debtor=2 (to). Debtor owes Payer.
-            // Balance represents 1 owes 2. Since 2 owes 1, Balance decreases.
             fromUser = payer;
             toUser = debtor;
             amountAdjustment = amount.negate();
         } else {
-            // Debtor (from) < Payer (to)
-            // Debtor owes Payer.
-            // Balance positive means "From (Debtor) owes To (Payer)".
-            // So we add the amount.
             fromUser = debtor;
             toUser = payer;
             amountAdjustment = amount;
@@ -66,5 +65,72 @@ public class UserBalanceService {
 
         userBalance.addToBalance(amountAdjustment);
         userBalanceRepository.save(userBalance);
+    }
+
+    /**
+     * Gets the consolidated view of balances for a user.
+     *
+     * @param userId the ID of the user
+     * @return BalanceResponseDTO containing owedToUser and owedByUser
+     */
+    @Transactional(readOnly = true)
+    public BalanceResponseDTO getUserBalance(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        List<UserBalance> balances = userBalanceRepository.findAllByFromUserOrToUser(user, user);
+
+        List<BalanceResponseDTO.UserBalanceDTO> owedToUser = new ArrayList<>();
+        List<BalanceResponseDTO.UserBalanceDTO> owedByUser = new ArrayList<>();
+
+        for (UserBalance b : balances) {
+            BigDecimal amount = b.getBalance();
+            if (amount.compareTo(BigDecimal.ZERO) == 0) continue;
+
+            User fromUser = b.getFromUser();
+            User toUser = b.getToUser();
+
+            // Balance > 0: from owes to
+            // Balance < 0: to owes from
+            
+            User creditor;
+            User debtor;
+            BigDecimal absoluteAmount = amount.abs();
+
+            if (amount.compareTo(BigDecimal.ZERO) > 0) {
+                debtor = fromUser;
+                creditor = toUser;
+            } else {
+                debtor = toUser;
+                creditor = fromUser;
+            }
+
+            if (creditor.getId().equals(userId)) {
+                // Someone owes the current user
+                owedToUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
+                        .user(toSummary(debtor))
+                        .amount(absoluteAmount)
+                        .build());
+            } else if (debtor.getId().equals(userId)) {
+                // Current user owes someone
+                owedByUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
+                        .user(toSummary(creditor))
+                        .amount(absoluteAmount)
+                        .build());
+            }
+        }
+
+        return BalanceResponseDTO.builder()
+                .owedToUser(owedToUser)
+                .owedByUser(owedByUser)
+                .build();
+    }
+
+    private UserSummaryDTO toSummary(User user) {
+        return UserSummaryDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .build();
     }
 }
