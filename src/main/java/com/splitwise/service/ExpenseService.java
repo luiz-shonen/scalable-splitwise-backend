@@ -3,26 +3,25 @@ package com.splitwise.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.splitwise.dto.ExpenseResponseDTO;
+import com.splitwise.dto.ExpenseValidationContext;
 import com.splitwise.dto.UserSummaryDTO;
 import com.splitwise.entity.Expense;
 import com.splitwise.entity.ExpenseShare;
 import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.enums.SplitType;
-import com.splitwise.exception.ValidationException;
 import com.splitwise.repository.ExpenseRepository;
 import com.splitwise.repository.ExpenseShareRepository;
 import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
 import com.splitwise.strategy.SplitStrategy;
 import com.splitwise.strategy.SplitStrategyFactory;
+import com.splitwise.validator.ExpenseValidator;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +38,7 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final UserBalanceService userBalanceService;
     private final SplitStrategyFactory splitStrategyFactory;
+    private final ExpenseValidator expenseValidator;
 
     /**
      * Creates a new expense, splits it among participants, and updates user balances.
@@ -61,11 +61,6 @@ public class ExpenseService {
         if (groupId != null) {
             group = groupRepository.findById(groupId)
                     .orElseThrow(() -> new EntityNotFoundException("Group not found: " + groupId));
-            
-            // Validate Payer belongs to Group
-            if (!group.getMembers().contains(payer)) {
-                throw new ValidationException("Payer with ID " + payerId + " does not belong to group: " + group.getName());
-            }
         }
 
         List<User> participants = userRepository.findAllById(participantIds);
@@ -73,18 +68,13 @@ public class ExpenseService {
             throw new EntityNotFoundException("One or more participants not found");
         }
 
-        // Validate all participants belong to the group if groupId is present
-        if (group != null) {
-            Set<Long> groupMemberIds = group.getMembers().stream()
-                    .map(User::getId)
-                    .collect(Collectors.toSet());
-            
-            for (User participant : participants) {
-                if (!groupMemberIds.contains(participant.getId())) {
-                    throw new ValidationException("Participant with ID " + participant.getId() + " does not belong to group: " + group.getName());
-                }
-            }
-        }
+        ExpenseValidationContext context = ExpenseValidationContext.builder()
+                .payer(payer)
+                .group(group)
+                .participants(participants)
+                .build();
+        
+        expenseValidator.validateAndThrow(context, "expenseValidationContext");
 
         // 1. Create Expense
         Expense expense = Expense.builder()

@@ -4,6 +4,13 @@
 API_URL="http://localhost:8080/api"
 TIMESTAMP=$(date +%s)
 
+echo "Waiting for API to be ready..."
+until $(curl --output /dev/null --silent --head --fail http://localhost:8080/actuator/health); do
+    printf '.'
+    sleep 1
+done
+echo -e "\nAPI is UP!"
+
 echo "1. Creating Users for Full System Test..."
 # Alice, Bob, Charlie
 USER1_JSON=$(curl -s -X POST "$API_URL/users" -H "Content-Type: application/json" -d "{\"name\": \"Alice\", \"email\": \"alice$TIMESTAMP@test.com\"}")
@@ -16,6 +23,11 @@ USER3_JSON=$(curl -s -X POST "$API_URL/users" -H "Content-Type: application/json
 USER3_ID=$(echo $USER3_JSON | jq '.id')
 
 echo "Users Created: $USER1_ID (Alice), $USER2_ID (Bob), $USER3_ID (Charlie)"
+
+echo -e "\n1b. Testing User Validation (Negative - Duplicate Email)..."
+DUPLICATE_USER=$(curl -s -X POST "$API_URL/users" -H "Content-Type: application/json" -d "{\"name\": \"Alice 2\", \"email\": \"alice$TIMESTAMP@test.com\"}")
+echo "Expected Validation Error (Duplicate Email):"
+echo $DUPLICATE_USER | jq '.'
 
 echo -e "\n2. Creating Group 'Housemates'..."
 GROUP_JSON=$(curl -s -X POST "$API_URL/groups" -H "Content-Type: application/json" -d "{

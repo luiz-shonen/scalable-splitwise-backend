@@ -2,7 +2,6 @@ package com.splitwise.service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +14,7 @@ import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
+import com.splitwise.validator.GroupValidator;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +25,7 @@ public class GroupService {
 
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final GroupValidator groupValidator;
 
     @Transactional
     public GroupResponseDTO createGroup(CreateGroupRequest request) {
@@ -45,6 +46,8 @@ public class GroupService {
         // Add creator as member if not already present
         group.getMembers().add(creator);
 
+        groupValidator.validateAndThrow(group, "group");
+
         group = groupRepository.save(group);
         return mapToDTO(group);
     }
@@ -63,10 +66,10 @@ public class GroupService {
                 .createdBy(toUserSummary(group.getCreatedBy()))
                 .members(group.getMembers().stream()
                         .map(this::toUserSummary)
-                        .collect(Collectors.toList()))
+                        .toList())
                 .expenses(group.getExpenses().stream()
                         .map(this::toExpenseSummary)
-                        .collect(Collectors.toList()))
+                        .toList())
                 .build();
     }
 

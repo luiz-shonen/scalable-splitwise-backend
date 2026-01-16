@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.splitwise.dto.CreateUserRequest;
 import com.splitwise.entity.User;
 import com.splitwise.repository.UserRepository;
+import com.splitwise.validator.UserValidator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserValidator userValidator;
 
     @Transactional
     public User createUser(CreateUserRequest request) {
@@ -24,6 +26,9 @@ public class UserService {
                 .name(request.getName())
                 .email(request.getEmail())
                 .build();
+        
+        userValidator.validateAndThrow(user, "user");
+
         return userRepository.save(user);
     }
 

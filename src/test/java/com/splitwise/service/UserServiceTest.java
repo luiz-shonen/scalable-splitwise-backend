@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.splitwise.dto.CreateUserRequest;
 import com.splitwise.entity.User;
 import com.splitwise.repository.UserRepository;
+import com.splitwise.validator.UserValidator;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -22,6 +23,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserValidator userValidator;
 
     @InjectMocks
     private UserService userService;
@@ -46,6 +50,7 @@ class UserServiceTest {
         Assertions.assertNotNull(result);
         Assertions.assertEquals(1L, result.getId());
         Assertions.assertEquals("John Doe", result.getName());
+        Mockito.verify(userValidator).validateAndThrow(Mockito.any(), Mockito.anyString());
         Mockito.verify(userRepository).save(Mockito.any(User.class));
     }
 

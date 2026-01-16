@@ -18,6 +18,7 @@ import com.splitwise.entity.Group;
 import com.splitwise.entity.User;
 import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
+import com.splitwise.validator.GroupValidator;
 
 @ExtendWith(MockitoExtension.class)
 class GroupServiceTest {
@@ -27,6 +28,9 @@ class GroupServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private GroupValidator groupValidator;
 
     @InjectMocks
     private GroupService groupService;
@@ -61,6 +65,7 @@ class GroupServiceTest {
         Assertions.assertNotNull(result);
         Assertions.assertEquals("Trip", result.getName());
         Assertions.assertEquals(1L, result.getCreatedBy().getId());
+        Mockito.verify(groupValidator).validateAndThrow(Mockito.any(), Mockito.anyString());
         Mockito.verify(groupRepository).save(Mockito.any(Group.class));
     }
 

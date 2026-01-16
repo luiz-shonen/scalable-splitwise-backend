@@ -26,6 +26,7 @@ import com.splitwise.repository.GroupRepository;
 import com.splitwise.repository.UserRepository;
 import com.splitwise.strategy.SplitStrategy;
 import com.splitwise.strategy.SplitStrategyFactory;
+import com.splitwise.validator.ExpenseValidator;
 
 @ExtendWith(MockitoExtension.class)
 class ExpenseServiceTest {
@@ -44,6 +45,8 @@ class ExpenseServiceTest {
     private SplitStrategyFactory splitStrategyFactory;
     @Mock
     private SplitStrategy splitStrategy;
+    @Mock
+    private ExpenseValidator expenseValidator;
 
     @InjectMocks
     private ExpenseService expenseService;
@@ -90,6 +93,7 @@ class ExpenseServiceTest {
         Assertions.assertEquals(amount, result.getAmount());
         Assertions.assertEquals(2, result.getShares().size());
         
+        Mockito.verify(expenseValidator).validateAndThrow(Mockito.any(), Mockito.anyString());
         Mockito.verify(expenseRepository).save(Mockito.any(Expense.class));
         Mockito.verify(splitStrategy).split(Mockito.any(Expense.class), Mockito.eq(participants), Mockito.any());
         Mockito.verify(expenseShareRepository, Mockito.times(2)).save(Mockito.any(ExpenseShare.class));
