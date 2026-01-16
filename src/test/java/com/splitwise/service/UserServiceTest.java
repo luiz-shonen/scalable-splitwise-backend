@@ -12,6 +12,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.splitwise.dto.CreateUserRequest;
+import com.splitwise.dto.UserResponseDTO;
 import com.splitwise.entity.User;
 import com.splitwise.repository.UserRepository;
 import com.splitwise.validator.UserValidator;
@@ -45,7 +46,7 @@ class UserServiceTest {
 
         Mockito.when(userRepository.save(Mockito.any(User.class))).thenReturn(savedUser);
 
-        User result = userService.createUser(request);
+        UserResponseDTO result = userService.createUser(request);
 
         Assertions.assertNotNull(result);
         Assertions.assertEquals(1L, result.getId());

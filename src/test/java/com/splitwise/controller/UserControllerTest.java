@@ -12,7 +12,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.splitwise.entity.User;
+import com.splitwise.dto.UserResponseDTO;
 import com.splitwise.service.UserService;
 
 @WebMvcTest(UserController.class)
@@ -26,8 +26,8 @@ class UserControllerTest {
 
     @Test
     void testCreateUser() throws Exception {
-        User user = User.builder().id(1L).name("Alice").email("alice@test.com").build();
-        Mockito.when(userService.createUser(Mockito.any())).thenReturn(user);
+        UserResponseDTO response = UserResponseDTO.builder().id(1L).name("Alice").email("alice@test.com").build();
+        Mockito.when(userService.createUser(Mockito.any())).thenReturn(response);
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)

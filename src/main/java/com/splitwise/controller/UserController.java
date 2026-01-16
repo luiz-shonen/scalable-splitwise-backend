@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.splitwise.dto.CreateUserRequest;
-import com.splitwise.entity.User;
+import com.splitwise.dto.UserResponseDTO;
 import com.splitwise.service.UserService;
 
 import jakarta.validation.Valid;
@@ -25,18 +25,18 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserRequest request) {
+    public ResponseEntity<UserResponseDTO> createUser(@Valid @RequestBody CreateUserRequest request) {
         return ResponseEntity.ok(userService.createUser(request));
     }
 
     @GetMapping
-    public List<User> getAllUsers() {
+    public List<UserResponseDTO> getAllUsers() {
         return userService.getAllUsers();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUser(@PathVariable(name = "id") Long id) {
-        return userService.getUserById(id)
+    public ResponseEntity<UserResponseDTO> getUser(@PathVariable(name = "id") Long id) {
+        return userService.getUserResponseById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

@@ -1,6 +1,14 @@
 package com.splitwise.entity;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,12 +23,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Entity representing a user in the Splitwise system.
@@ -54,6 +56,7 @@ public class User {
      * Uses mappedBy to indicate the owning side is in Group entity.
      */
     @ManyToMany(mappedBy = "members", fetch = FetchType.LAZY)
+    @JsonIgnore
     @Builder.Default
     private Set<Group> groups = new HashSet<>();
 
