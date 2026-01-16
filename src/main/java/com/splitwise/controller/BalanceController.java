@@ -39,22 +39,42 @@ public class BalanceController {
         }
 
         List<UserBalance> allBalances = userBalanceRepository.findAll();
-
         List<BalanceResponseDTO.UserBalanceDTO> owedToUser = new ArrayList<>();
         List<BalanceResponseDTO.UserBalanceDTO> owedByUser = new ArrayList<>();
 
         for (UserBalance b : allBalances) {
-            if (b.getBalance().compareTo(BigDecimal.ZERO) == 0) continue;
+            BigDecimal amount = b.getBalance();
+            if (amount.compareTo(BigDecimal.ZERO) == 0) continue;
 
-            if (b.getToUser().getId().equals(userId)) {
+            User fromUser = b.getFromUser();
+            User toUser = b.getToUser();
+
+            // Balance > 0: from owes to
+            // Balance < 0: to owes from
+            
+            User creditor;
+            User debtor;
+            BigDecimal absoluteAmount = amount.abs();
+
+            if (amount.compareTo(BigDecimal.ZERO) > 0) {
+                debtor = fromUser;
+                creditor = toUser;
+            } else {
+                debtor = toUser;
+                creditor = fromUser;
+            }
+
+            if (creditor.getId().equals(userId)) {
+                // Someone owes the current user
                 owedToUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
-                        .user(toSummary(b.getFromUser()))
-                        .amount(b.getBalance())
+                        .user(toSummary(debtor))
+                        .amount(absoluteAmount)
                         .build());
-            } else if (b.getFromUser().getId().equals(userId)) {
+            } else if (debtor.getId().equals(userId)) {
+                // Current user owes someone
                 owedByUser.add(BalanceResponseDTO.UserBalanceDTO.builder()
-                        .user(toSummary(b.getToUser()))
-                        .amount(b.getBalance())
+                        .user(toSummary(creditor))
+                        .amount(absoluteAmount)
                         .build());
             }
         }
