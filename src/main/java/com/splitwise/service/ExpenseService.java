@@ -65,8 +65,12 @@ public class ExpenseService {
             List<Long> participantIds,
             List<ExpenseSplitDTO> splitDetails
     ) {
-        log.info("Creating expense: description={}, amount={}, splitType={}, payerId={}, groupId={}", 
-                description, amount, splitType, payerId, groupId);
+        log.info("Creating expense: {}, {}, {}, {}, {}", 
+                StructuredLogging.getKV("description", description),
+                StructuredLogging.getKV("amount", amount),
+                StructuredLogging.getKV("splitType", splitType),
+                StructuredLogging.getKV("payerId", payerId),
+                StructuredLogging.getKV("groupId", groupId));
 
         User payer = userRepository.findById(payerId)
                 .orElseThrow(() -> new EntityNotFoundException("Payer not found: " + payerId));
@@ -79,7 +83,9 @@ public class ExpenseService {
 
         List<User> participants = userRepository.findAllById(participantIds);
         if (participants.size() != participantIds.size()) {
-            log.error("Participant mismatch: requestedIds={}, foundCount={}", participantIds, participants.size());
+            log.error("Participant mismatch: {}, {}", 
+                    StructuredLogging.getKV("requestedIds", participantIds),
+                    StructuredLogging.getKV("foundCount", participants.size()));
             throw new EntityNotFoundException("One or more participants not found");
         }
 

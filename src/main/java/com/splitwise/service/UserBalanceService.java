@@ -39,7 +39,7 @@ public class UserBalanceService {
     @Transactional
     public void updateUserBalance(User payer, User debtor, BigDecimal amount) {
         if (payer.getId().equals(debtor.getId())) {
-            log.trace("Skipping balance update for self: userId={}", payer.getId());
+            log.trace("Skipping balance update for self: {}", StructuredLogging.getKV("userId", payer.getId()));
             return; 
         }
 
@@ -58,7 +58,8 @@ public class UserBalanceService {
             amountAdjustment = amount;
         }
 
-        log.debug("Updating balance: pair=[{}, {}], adjustment={}", fromUser.getId(), toUser.getId(), amountAdjustment);
+        log.debug("Updating balance: pair=[{}, {}], {}", 
+                fromUser.getId(), toUser.getId(), StructuredLogging.getKV("adjustment", amountAdjustment));
 
         Optional<UserBalance> existingBalance = userBalanceRepository
                 .findByFromUserAndToUser(fromUser, toUser);
@@ -85,7 +86,7 @@ public class UserBalanceService {
      */
     @Transactional(readOnly = true)
     public BalanceResponseDTO getUserBalance(Long userId) {
-        log.debug("Fetching balances for userId={}", userId);
+        log.debug("Fetching balances for {}", StructuredLogging.getKV("userId", userId));
         
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
@@ -127,7 +128,8 @@ public class UserBalanceService {
             }
         }
 
-        log.debug("Found {} credit/debit pairs for user {}", owedToUser.size() + owedByUser.size(), userId);
+        log.debug("Found {} credit/debit pairs for {}", 
+                owedToUser.size() + owedByUser.size(), StructuredLogging.getKV("userId", userId));
         return BalanceResponseDTO.builder()
                 .owedToUser(owedToUser)
                 .owedByUser(owedByUser)
