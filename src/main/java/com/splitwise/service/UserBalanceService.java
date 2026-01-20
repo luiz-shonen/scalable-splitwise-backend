@@ -38,6 +38,10 @@ public class UserBalanceService {
      */
     @Transactional
     public void updateUserBalance(User payer, User debtor, BigDecimal amount) {
+        updateBalanceInternal(payer, debtor, amount);
+    }
+
+    private void updateBalanceInternal(User payer, User debtor, BigDecimal amount) {
         if (payer.getId().equals(debtor.getId())) {
             log.trace("Skipping balance update for self: {}", StructuredLogging.getKV("userId", payer.getId()));
             return; 
@@ -134,6 +138,35 @@ public class UserBalanceService {
                 .owedToUser(owedToUser)
                 .owedByUser(owedByUser)
                 .build();
+    }
+
+    /**
+     * Settles a payment between two users.
+     * This reduces the balance and can mark involved expense shares as settled.
+     * 
+     * @param fromUserId the user making the payment
+     * @param toUserId the user receiving the payment
+     * @param amount the payment amount
+     */
+    @Transactional
+    public void settlePayment(Long fromUserId, Long toUserId, BigDecimal amount) {
+        log.info("Settling payment: {}, {}, {}", 
+                StructuredLogging.getKV("fromUserId", fromUserId),
+                StructuredLogging.getKV("toUserId", toUserId),
+                StructuredLogging.getKV("amount", amount));
+
+        User fromUser = userRepository.findById(fromUserId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + fromUserId));
+        User toUser = userRepository.findById(toUserId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + toUserId));
+
+        // Use the existing updateUserBalance logic but with negative adjustment for settlement
+        // if fromUser pays toUser, we decrease what fromUser owes to toUser
+        // In our logic, updateUserBalance(payer, debtor, amount) means debtor owes payer 'amount'
+        // So for settlement, it's effectively like 'toUser' (payee) paid 'fromUser' (payer) back
+        updateBalanceInternal(toUser, fromUser, amount.negate());
+        
+        log.info("Payment settled successfully");
     }
 
     private UserSummaryDTO toSummary(User user) {

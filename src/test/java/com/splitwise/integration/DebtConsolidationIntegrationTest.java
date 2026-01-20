@@ -33,7 +33,7 @@ import com.splitwise.repository.UserRepository;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class DebtConsolidationIntegrationTest {
+public class DebtConsolidationIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -62,11 +62,11 @@ class DebtConsolidationIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        expenseShareRepository.deleteAll();
-        expenseRepository.deleteAll();
-        userBalanceRepository.deleteAll();
-        groupRepository.deleteAll();
-        userRepository.deleteAll();
+        expenseShareRepository.deleteAllInBatch();
+        expenseRepository.deleteAllInBatch();
+        userBalanceRepository.deleteAllInBatch();
+        groupRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
 
         alice = userRepository.save(User.builder().name("Alice").email("alice@test.com").build());
         bob = userRepository.save(User.builder().name("Bob").email("bob@test.com").build());

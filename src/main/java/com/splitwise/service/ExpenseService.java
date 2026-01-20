@@ -141,6 +141,20 @@ public class ExpenseService {
         return mapToDTO(expense);
     }
 
+    public List<ExpenseResponseDTO> getGroupExpenses(Long groupId) {
+        log.debug("Fetching expenses for group: {}", StructuredLogging.getKV("groupId", groupId));
+        return expenseRepository.findByGroupId(groupId).stream()
+                .map(this::mapToDTO)
+                .toList();
+    }
+
+    public List<ExpenseResponseDTO> getUserExpenses(Long userId) {
+        log.debug("Fetching expenses for user: {}", StructuredLogging.getKV("userId", userId));
+        return expenseRepository.findAllUserExpenses(userId).stream()
+                .map(this::mapToDTO)
+                .toList();
+    }
+
     private ExpenseResponseDTO mapToDTO(Expense expense) {
         return ExpenseResponseDTO.builder()
                 .id(expense.getId())

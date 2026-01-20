@@ -1,6 +1,10 @@
 package com.splitwise.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,5 +46,17 @@ public class ExpenseController {
                 request.getSplitDetails()
         );
         return ResponseEntity.ok(expense);
+    }
+
+    @GetMapping("/group/{groupId}")
+    @Operation(summary = "Get group expenses", description = "Returns all expenses for a specific group.")
+    public ResponseEntity<List<ExpenseResponseDTO>> getGroupExpenses(@PathVariable(name = "groupId") Long groupId) {
+        return ResponseEntity.ok(expenseService.getGroupExpenses(groupId));
+    }
+
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "Get user expenses", description = "Returns all expenses a user is involved in (as payer or participant).")
+    public ResponseEntity<List<ExpenseResponseDTO>> getUserExpenses(@PathVariable(name = "userId") Long userId) {
+        return ResponseEntity.ok(expenseService.getUserExpenses(userId));
     }
 }
